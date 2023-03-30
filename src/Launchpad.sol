@@ -10,6 +10,7 @@ contract Launchpad {
         address token;
         uint32 id;
         uint256 minimumSubscription;
+        uint256 maximumSubscription;
         uint256 tokenTotalSupply;
         uint256 publicShare;
         uint256 platformShare;
@@ -35,7 +36,8 @@ contract Launchpad {
     error notController();
     error IFO_Not_Started();
     error IFO_Already_Started;
-    error Amount_less_Than_Minimum_Amount();
+    error Amount_less_Than_Minimum_Subscription();
+    error Amount_greater_Than_Maximum_Subscription();
     error IFO_Not_Ended();
     error IFO_Not_In_Session();
     error Account_Not_Found();
@@ -95,13 +97,14 @@ contract Launchpad {
 
     function buyIFO(uint256 _amount, uint32 _id) public {
         // addIFO_ID();
-        if(_amount < IFODetail.minimumSubscription ) revert Amount_less_Than_Minimum_Amount();
+        if(_amount < IFODetail.minimumSubscription ) revert Amount_less_Than_Minimum_Subscription();
+        if(_amount > IFODetail.maximumSubscription ) revert Amount_greater_Than_Maximum_Subscription();
 
         (bool success, ) = address(this).call{value: _amount}("");
         require(success, "Transaction FAIL...!");
         uint256 xRate = IFODetail.exchangeRate;
-        uint256 rRate = _amount * xRate;
-        Subscriber_To_Amount[msg.sender][_id] = rRate;
+        uint256 amount_bought = _amount * xRate;
+        Subscriber_To_Amount[msg.sender][_id] = amount_bought;
     }
 
     function updateReturns(uint32 _id) internal returns(uint256 reward) {
