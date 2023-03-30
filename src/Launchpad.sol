@@ -13,6 +13,7 @@ contract Launchpad {
         uint256 tokenTotalSupply;
         uint256 publicShare;
         uint256 platformShare;
+        uint256 exchangeRate;
         string tokenName;
         string tokenSymbol;
         bool hasStarted;
@@ -98,13 +99,15 @@ contract Launchpad {
 
         (bool success, ) = address(this).call{value: _amount}("");
         require(success, "Transaction FAIL...!");
-
+        uint256 xRate = IFODetail.exchangeRate;
+        
         Subscriber_To_Amount[msg.sender][_id] = _amount;
     }
 
     function updateReturns(uint32 _id) internal returns(uint256 reward) {
         uint256 amount_bought = Subscriber_To_Amount[msg.sender][_id];
-        uint32 tokenFormular =  
+        uint256 tokenShare = IFODetail.publicShare;
+        uint32 tokenFormular = 
     }
 
 
