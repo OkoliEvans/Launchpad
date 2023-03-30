@@ -11,6 +11,8 @@ contract Launchpad {
         uint32 id;
         uint256 minimumSubscription;
         uint256 tokenTotalSupply;
+        uint256 publicShare;
+        uint256 platformShare;
         string tokenName;
         string tokenSymbol;
         bool hasStarted;
@@ -87,18 +89,22 @@ contract Launchpad {
     }
 
     function addIFO_ID(uint32 _id) public {
-        
+
     }
 
-    function buyIFO(uint256 _amount) public {
-        addIFO_ID();
+    function buyIFO(uint256 _amount, uint32 _id) public {
+        // addIFO_ID();
         if(_amount < IFODetail.minimumSubscription ) revert Amount_less_Than_Minimum_Amount();
 
         (bool success, ) = address(this).call{value: _amount}("");
         require(success, "Transaction FAIL...!");
 
         Subscriber_To_Amount[msg.sender][_id] = _amount;
+    }
 
+    function updateReturns(uint32 _id) internal returns(uint256 reward) {
+        uint256 amount_bought = Subscriber_To_Amount[msg.sender][_id];
+        uint32 tokenFormular =  
     }
 
 
