@@ -100,8 +100,8 @@ contract Launchpad {
         (bool success, ) = address(this).call{value: _amount}("");
         require(success, "Transaction FAIL...!");
         uint256 xRate = IFODetail.exchangeRate;
-        
-        Subscriber_To_Amount[msg.sender][_id] = _amount;
+        uint256 rRate = _amount * xRate;
+        Subscriber_To_Amount[msg.sender][_id] = rRate;
     }
 
     function updateReturns(uint32 _id) internal returns(uint256 reward) {
