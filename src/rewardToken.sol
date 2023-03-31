@@ -5,7 +5,7 @@ import "lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 
 contract Hashnode is ERC20 {
 
-    constructor(uint256 _amount) ERC20("HashSys","HASH") {
+    constructor(uint256 _amount) ERC20("HashSys","HNSH") {
         _mint(address(this), _amount * 1e18);
     }
 

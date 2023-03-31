@@ -16,7 +16,6 @@ contract Launchpad {
         uint256 publicShare;
         uint256 platformShare;
         uint256 exchangeRate;
-        uint256 duration;
         string tokenName;
         string tokenSymbol;
         bool hasStarted;
@@ -50,8 +49,12 @@ contract Launchpad {
 
     ////////  EVENTS  /////////
 
+    constructor() {
+        Controller = msg.sender;
+    }
 
-    ////////  INTERNAL FUNCTIONS  ///////////
+
+    ////////   FUNCTIONS  ///////////
 
     function createIFO(
         uint32 _id,
@@ -63,7 +66,6 @@ contract Launchpad {
         uint256 _tokenTotalSupply,
         uint256 _publicShare,
         uint256 _exchangeRate,
-        uint256 _duration,
         string memory _tokenName,
         string memory _tokenSymbol
         ) external  {
@@ -78,7 +80,6 @@ contract Launchpad {
         if(_tokenTotalSupply <= 0) revert Value_cannot_be_empty();
         if(_publicShare <= 0) revert Value_cannot_be_empty();
         if(_exchangeRate <= 0) revert Value_cannot_be_empty();
-        if(_duration <= 0) revert Value_cannot_be_empty();
         if(_admin == address(0)) revert Value_cannot_be_empty();
 
 
@@ -95,10 +96,9 @@ contract Launchpad {
         ifoDetail.publicShare = _publicShare;
         ifoDetail.platformShare = _tokenTotalSupply - _publicShare;
         ifoDetail.exchangeRate = _exchangeRate;
-        ifoDetail.duration = _duration;
         ifoDetail.tokenName = _tokenName;
         ifoDetail.tokenSymbol = _tokenSymbol;
-        ifoDetail.hasStarted = true;
+        ifoDetail.hasStarted = false;
         ifoDetail.maxCapReached = false;
 
     }
@@ -110,15 +110,14 @@ contract Launchpad {
         if (ifoDetail.id == 0) revert IFO_Details_Not_Found();
 
         startTime = block.timestamp;
-        duration = startTime - _endTime;
-        ifoDetail.duration = duration;
+        duration = _endTime - startTime;
         ifoDetail.hasStarted = true;
       
     }
 
     function showDuration(uint32 _id) public view returns(uint256 _duration) {
            IFODetail storage ifoDetail = IFODetails_ID[_id];
-           _duration = ifoDetail.duration;
+           _duration = duration;
     }
 
 
@@ -139,23 +138,24 @@ contract Launchpad {
         ifoDetail.publicShare = 0;
         ifoDetail.platformShare = 0;
         ifoDetail.exchangeRate = 0;
-        ifoDetail.duration = 0;
         ifoDetail.tokenName = "";
         ifoDetail.tokenSymbol = "";
         ifoDetail.maxCapReached = false;
     }
 
-    function buyPresale(uint256 _amount, uint32 _id) external {
+    function buyPresale(uint256 _amount, uint32 _id) external payable {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         if(_amount < ifoDetail.minimumSubscription ) revert Amount_less_Than_Minimum_Subscription();
         if(_amount > ifoDetail.maximumSubscription ) revert Amount_greater_Than_Maximum_Subscription();
         if(ifoDetail.maxCapReached) revert MaxCapReached();
+        if(ifoDetail.hasStarted == false) revert IFO_Not_In_Session();
 
         (bool success, ) = address(this).call{value: _amount}("");
         require(success, "Transaction FAIL...!");
         uint256 xRate = ifoDetail.exchangeRate;
         uint256 amount_bought = _amount * xRate;
         Amount_per_subscriber[msg.sender][_id] = amount_bought;
+        // Amount_per_subscriber[msg.sender][_id] = _amount;
         totalAmountRaised += _amount;
 
     }
@@ -181,7 +181,7 @@ contract Launchpad {
         IERC20(ifoDetail.token).transfer(_to, _amount);
     }
 
-    function withdrawEther(uint256 _amount, address _to) external {
+    function withdrawEther(uint256 _amount, address payable _to) external payable{
         if(_amount > address(this).balance) revert Insufficient_Funds();
         if(_to == address(0)) revert Invalid_Address();
 
