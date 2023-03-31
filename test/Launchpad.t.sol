@@ -4,6 +4,7 @@ pragma solidity ^0.8.17;
 import "../lib/forge-std/src/Test.sol";
 import "../src/Launchpad.sol";
 import "../src/rewardToken.sol";
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
 
 contract LaunchpadTest is Test {
     Launchpad launchpad;
@@ -11,7 +12,7 @@ contract LaunchpadTest is Test {
 
     function setUp() public {
         address admin = 0x3791dC91d33bC7cc4fBFE033478afa06E2E154Bc;
-        address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
+        // address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
         // address controller = 0x3791dC91d33bC7cc4fBFE033478afa06E2E154Bc;
 
         launchpad = new Launchpad();
@@ -22,8 +23,7 @@ contract LaunchpadTest is Test {
     function test_Launchpad() public {
         address admin = 0x3791dC91d33bC7cc4fBFE033478afa06E2E154Bc;
         address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
-        address hashN = address(hashnode);
-
+        // address cydx = 0x04566666;
         vm.prank(admin);
         hashnode.approve(address(launchpad), 1000000 * 1e18);
         
@@ -48,7 +48,10 @@ contract LaunchpadTest is Test {
         vm.deal(user, 5 ether);
         vm.prank(user);
         launchpad.buyPresale{value: 0.5 ether}(100);
-        console.log(user.balance);
+
+        vm.deal( address(0x08), 5 ether);
+        vm.prank(address(0x08));
+        launchpad.buyPresale{value: 2 ether}(100);
         
         // END ICO
         launchpad.endIFO(100);
@@ -66,20 +69,27 @@ contract LaunchpadTest is Test {
 
     function test_claimToken() public {
         test_Launchpad();
-        address admin = 0x3791dC91d33bC7cc4fBFE033478afa06E2E154Bc;
         address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
-        address hashN = address(hashnode);
-        console.log(address(launchpad));
+
         vm.prank(user);
-        address demo = launchpad.claimToken(100);
-        console.log(demo);
+        launchpad.claimToken(100);
     }
 
     function testWithdraw() public {
         test_Launchpad();
-        address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
-        uint256 platformBal = launchpad.withdrawToken(user, 100, 500);
+        address Controller = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
+
+        uint256 platformBal = launchpad.withdrawToken(Controller, 100, 20000 * 1e18);
         console.log(platformBal);
+    }
+
+    function test_Withdraw_Eth() public {
+        test_Launchpad();
+        address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
+
+        launchpad.withdrawEther( 2 ether ,payable(user));
+        console.log(address(launchpad).balance);
+        console.log(user.balance);
     }
 
 }

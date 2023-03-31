@@ -120,26 +120,6 @@ contract Launchpad {
     }
 
 
-    function endIFO(uint32 _id) external {
-        IFODetail storage ifoDetail = IFODetails_ID[_id];
-        if(msg.sender != Controller) revert notController();
-        if (ifoDetail.hasStarted == false) revert IFO_Not_In_Session();
-        if (ifoDetail.id == 0) revert IFO_Details_Not_Found();
-        if(block.timestamp < endTime) revert IFO_Not_Ended();
-
-        ifoDetail.hasStarted = false;
-        // ifoDetail.token = address(0);
-        ifoDetail.id = 0;
-        ifoDetail.MaxCap = 0;
-        ifoDetail.minimumSubscription = 0;
-        ifoDetail.maximumSubscription = 0;
-
-        ifoDetail.exchangeRate = 0;
-        ifoDetail.tokenName = "";
-        ifoDetail.tokenSymbol = "";
-        ifoDetail.maxCapReached = false;
-    }
-
     function buyPresale(uint32 _id) external payable {
         uint _amount = msg.value;
         IFODetail storage ifoDetail = IFODetails_ID[_id];
@@ -160,6 +140,28 @@ contract Launchpad {
 
     }
 
+    function endIFO(uint32 _id) external {
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        if(msg.sender != Controller) revert notController();
+        if (ifoDetail.hasStarted == false) revert IFO_Not_In_Session();
+        if (ifoDetail.id == 0) revert IFO_Details_Not_Found();
+        if(block.timestamp < endTime) revert IFO_Not_Ended();
+
+        ifoDetail.hasStarted = false;
+        // ifoDetail.token = address(0);
+        // ifoDetail.id = 0;
+        ifoDetail.MaxCap = 0;
+        ifoDetail.minimumSubscription = 0;
+        ifoDetail.maximumSubscription = 0;
+
+        ifoDetail.exchangeRate = 0;
+        ifoDetail.tokenName = "";
+        ifoDetail.tokenSymbol = "";
+        ifoDetail.maxCapReached = false;
+
+        
+    }
+
     function getTotalEthRaised() external view returns(uint256){
         return totalAmountRaised;
     }
@@ -173,7 +175,7 @@ contract Launchpad {
         return Amount_per_subscriber[_user][_id];
     }
 
-    function claimToken(uint32 _id) external returns(address tko){
+    function claimToken(uint32 _id) external {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         require(Amount_per_subscriber[msg.sender][_id] > 0, "No record found");
         if(ifoDetail.hasStarted == true) revert IFO_still_in_progress();
@@ -181,8 +183,7 @@ contract Launchpad {
         uint256 _amount = Amount_per_subscriber[msg.sender][_id];
         if(_amount > ifoDetail.publicshareBalance) revert Insufficient_Funds();
         ifoDetail.publicshareBalance -= _amount;
-        tko = IFODetails_ID[_id].token;
-       IERC20(tko).transfer(msg.sender, _amount);
+       IERC20(ifoDetail.token).transfer(msg.sender, _amount);
        Amount_per_subscriber[msg.sender][_id] = 0;
     }
 
@@ -191,13 +192,14 @@ contract Launchpad {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         if(_to == address(0)) revert Invalid_Address();
         if(_amount > ifoDetail.platformShare) revert Insufficient_Funds();
-        IERC20(ifoDetail.token).approve(Controller, _amount);
-        IERC20(ifoDetail.token).transferFrom(address(this),_to, _amount);
+        
+        IERC20(ifoDetail.token).transfer(_to, _amount);
         ifoDetail.platformShare -= _amount;
         return ifoDetail.platformShare;
     }
 
-    function withdrawEther(uint256 _amount, address payable _to) external payable{
+    function withdrawEther(uint256 _amount, address payable _to) external payable {
+        if(msg.sender != Controller) revert notController();
         if(_amount > address(this).balance) revert Insufficient_Funds();
         if(_to == address(0)) revert Invalid_Address();
 
