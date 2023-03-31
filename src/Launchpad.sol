@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-
+import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
+// import "../";
 contract Launchpad {
 
     struct IFODetail {
         address admin;
         address token;
         uint32 id;
+        uint256 publicshareBalance;
         uint256 MaxCap;
         uint256 minimumSubscription;
         uint256 maximumSubscription;
@@ -40,6 +41,7 @@ contract Launchpad {
     error Amount_greater_Than_Maximum_Subscription();
     error IFO_Not_Ended();
     error IFO_Not_In_Session();
+    error IFO_still_in_progress();
     error Account_Not_Found();
     error Value_cannot_be_empty();
     error IFO_Details_Not_Found();
@@ -82,13 +84,11 @@ contract Launchpad {
         if(_exchangeRate <= 0) revert Value_cannot_be_empty();
         if(_admin == address(0)) revert Value_cannot_be_empty();
 
-
-        uint256 amount = ifoDetail.tokenTotalSupply;
-        IERC20(_token).transferFrom(msg.sender, address(this), amount);
+        IERC20(_token).transferFrom(_admin, address(this), _tokenTotalSupply);
        
         ifoDetail.id = _id;
         ifoDetail.admin = _admin;
-        ifoDetail.token = _token;
+        IFODetails_ID[_id].token = _token;
         ifoDetail.MaxCap = _maxCap;
         ifoDetail.minimumSubscription = _minimumSubscription;
         ifoDetail.maximumSubscription = _maximumSubscription;
@@ -115,8 +115,7 @@ contract Launchpad {
       
     }
 
-    function showDuration(uint32 _id) public view returns(uint256 _duration) {
-           IFODetail storage ifoDetail = IFODetails_ID[_id];
+    function showDuration() public view returns(uint256 _duration) {
            _duration = duration;
     }
 
@@ -129,56 +128,73 @@ contract Launchpad {
         if(block.timestamp < endTime) revert IFO_Not_Ended();
 
         ifoDetail.hasStarted = false;
-        ifoDetail.token = address(0);
+        // ifoDetail.token = address(0);
         ifoDetail.id = 0;
         ifoDetail.MaxCap = 0;
         ifoDetail.minimumSubscription = 0;
         ifoDetail.maximumSubscription = 0;
-        ifoDetail.tokenTotalSupply = 0;
-        ifoDetail.publicShare = 0;
-        ifoDetail.platformShare = 0;
+
         ifoDetail.exchangeRate = 0;
         ifoDetail.tokenName = "";
         ifoDetail.tokenSymbol = "";
         ifoDetail.maxCapReached = false;
     }
 
-    function buyPresale(uint256 _amount, uint32 _id) external payable {
+    function buyPresale(uint32 _id) external payable {
+        uint _amount = msg.value;
         IFODetail storage ifoDetail = IFODetails_ID[_id];
-        if(_amount < ifoDetail.minimumSubscription ) revert Amount_less_Than_Minimum_Subscription();
-        if(_amount > ifoDetail.maximumSubscription ) revert Amount_greater_Than_Maximum_Subscription();
-        if(ifoDetail.maxCapReached) revert MaxCapReached();
         if(ifoDetail.hasStarted == false) revert IFO_Not_In_Session();
+        if(_amount < ifoDetail.minimumSubscription ) revert Amount_less_Than_Minimum_Subscription();
+        if(ifoDetail.maximumSubscription < _amount) revert Amount_greater_Than_Maximum_Subscription();
+        if(ifoDetail.maxCapReached) revert MaxCapReached();
+        if(ifoDetail.publicShare == 0) revert MaxCapReached();
 
-        (bool success, ) = address(this).call{value: _amount}("");
-        require(success, "Transaction FAIL...!");
+        // (bool success, ) = address(this).call{value: _amount}("");
+        // require(success, "Transaction FAIL...!");
         uint256 xRate = ifoDetail.exchangeRate;
         uint256 amount_bought = _amount * xRate;
+        ifoDetail.publicShare -= amount_bought;
+        ifoDetail.publicshareBalance += amount_bought;
         Amount_per_subscriber[msg.sender][_id] = amount_bought;
-        // Amount_per_subscriber[msg.sender][_id] = _amount;
         totalAmountRaised += _amount;
 
     }
 
-    function claimToken(uint32 _id) external {
+    function getTotalEthRaised() external view returns(uint256){
+        return totalAmountRaised;
+    }
+
+    function getPublicBalance(uint32 _id) external view returns(uint256){
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        return ifoDetail.publicshareBalance;
+    }
+
+    function getAmountPerSubscriber(address _user, uint32 _id) external view returns(uint256) {
+        return Amount_per_subscriber[_user][_id];
+    }
+
+    function claimToken(uint32 _id) external returns(address tko){
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         require(Amount_per_subscriber[msg.sender][_id] > 0, "No record found");
+        if(ifoDetail.hasStarted == true) revert IFO_still_in_progress();
 
         uint256 _amount = Amount_per_subscriber[msg.sender][_id];
-        if(_amount > ifoDetail.publicShare) revert Insufficient_Funds();
-        ifoDetail.publicShare - _amount;
-       IERC20(ifoDetail.token).transfer(msg.sender, _amount);
+        if(_amount > ifoDetail.publicshareBalance) revert Insufficient_Funds();
+        ifoDetail.publicshareBalance -= _amount;
+        tko = IFODetails_ID[_id].token;
+       IERC20(tko).transfer(msg.sender, _amount);
        Amount_per_subscriber[msg.sender][_id] = 0;
     }
 
-    function withdrawToken(address _to,uint32 _id, uint256 _amount) external {
+    function withdrawToken(address _to,uint32 _id, uint256 _amount) external returns(uint256) {
         if(msg.sender != Controller) revert notController();
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         if(_to == address(0)) revert Invalid_Address();
         if(_amount > ifoDetail.platformShare) revert Insufficient_Funds();
-        
-        ifoDetail.platformShare - _amount;
-        IERC20(ifoDetail.token).transfer(_to, _amount);
+        IERC20(ifoDetail.token).approve(Controller, _amount);
+        IERC20(ifoDetail.token).transferFrom(address(this),_to, _amount);
+        ifoDetail.platformShare -= _amount;
+        return ifoDetail.platformShare;
     }
 
     function withdrawEther(uint256 _amount, address payable _to) external payable{
