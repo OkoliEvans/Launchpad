@@ -16,10 +16,11 @@ contract DeployScript is Script {
         uint256 key = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(key);
 
-        vm.broadcast();
 
         launchpad = new Launchpad();
         hashnode = new Hashnode(deployer,20_000_000);
+       
+        vm.stopBroadcast();
 
     }
 }
