@@ -63,7 +63,7 @@ contract LaunchpadTest is Test {
         launchpad.getTotalEthRaised();
 
         //GET AMOUNT SUBSCRIBED PER USER
-        launchpad.getAmountPerSubscriber(user, 100);
+        launchpad.getAmountPerSubscriber(address(0x08), 100);
 
     }
 
