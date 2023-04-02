@@ -43,7 +43,7 @@ contract LaunchpadTest is Test {
 
         //DUPLICATE TESTING
         launchpad.createIFO(
-            100,
+            1001,
             admin,
             address(0x2e234DAe75C793f67A35089C9d99245E1C58470b),
             100 ether,
