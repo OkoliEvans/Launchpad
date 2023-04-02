@@ -25,7 +25,7 @@ contract LaunchpadTest is Test {
         address user = 0xF04a5cC80B1E94C69B48f5ee68a08CD2F09A7c3E;
         // address cydx = 0x04566666;
         vm.prank(admin);
-        hashnode.approve(address(launchpad), 1000000 * 1e18);
+        hashnode.approve(address(launchpad), 2000000 * 1e18);
         
         launchpad.createIFO(
             100,
@@ -35,19 +35,37 @@ contract LaunchpadTest is Test {
             0.5 ether,
             2 ether,
             1000000 * 1e18,
-            800000 * 1e18,
+            500000 * 1e18,
             100,
             "HashSys",
             "HNSH"
         );
+
+        //DUPLICATE TESTING
+        launchpad.createIFO(
+            100,
+            admin,
+            address(0x2e234DAe75C793f67A35089C9d99245E1C58470b),
+            100 ether,
+            0.5 ether,
+            2 ether,
+            1000000 * 1e18,
+            500000 * 1e18,
+            100,
+            "HashSys",
+            "HNSH"
+        );
+
+
         hashnode.balanceOf(address(launchpad));
         // start ICO
         launchpad.startIFO(100, 1680421243);
 
+
         // BUY ICO TOKEN
         vm.deal(user, 5 ether);
         vm.prank(user);
-        launchpad.buyPresale{value: 0.5 ether}(100);
+        launchpad.buyPresale{value: 2 ether}(100);
 
         vm.deal( address(0x08), 5 ether);
         vm.prank(address(0x08));
@@ -64,6 +82,12 @@ contract LaunchpadTest is Test {
 
         //GET AMOUNT SUBSCRIBED PER USER
         launchpad.getAmountPerSubscriber(address(0x08), 100);
+
+        // GET DURATION
+        launchpad.showDuration();
+
+        // GET PLATFORM SHARE
+        launchpad.getPlatformShare(100);
 
     }
 

@@ -48,6 +48,7 @@ contract Launchpad {
     error MaxCapReached();
     error Insufficient_Funds();
     error Invalid_Address();
+    error ID_Taken_Choose_Another_ID();
 
     ////////  EVENTS  /////////
 
@@ -75,6 +76,7 @@ contract Launchpad {
         if(msg.sender != Controller) revert notController();
         if (ifoDetail.hasStarted == true) revert IFO_Already_Started();
         if(_id <= 0) revert Value_cannot_be_empty();
+         if(ifoDetail.id == _id) revert ID_Taken_Choose_Another_ID();
         if(_maxCap <= 0) revert Value_cannot_be_empty();
         if(_token == address(0))revert Value_cannot_be_empty();
         if(_minimumSubscription <= 0) revert Value_cannot_be_empty();
@@ -88,7 +90,7 @@ contract Launchpad {
        
         ifoDetail.id = _id;
         ifoDetail.admin = _admin;
-        IFODetails_ID[_id].token = _token;
+        ifoDetail.token = _token;
         ifoDetail.MaxCap = _maxCap;
         ifoDetail.minimumSubscription = _minimumSubscription;
         ifoDetail.maximumSubscription = _maximumSubscription;
@@ -129,13 +131,11 @@ contract Launchpad {
         if(ifoDetail.maxCapReached) revert MaxCapReached();
         if(ifoDetail.publicShare == 0) revert MaxCapReached();
 
-        // (bool success, ) = address(this).call{value: _amount}("");
-        // require(success, "Transaction FAIL...!");
         uint256 xRate = ifoDetail.exchangeRate;
         uint256 amount_bought = _amount * xRate;
         ifoDetail.publicShare -= amount_bought;
         ifoDetail.publicshareBalance += amount_bought;
-        Amount_per_subscriber[msg.sender][_id] = amount_bought;
+        Amount_per_subscriber[msg.sender][_id] += amount_bought;
         totalAmountRaised += _amount;
 
     }
@@ -148,8 +148,7 @@ contract Launchpad {
         if(block.timestamp < endTime) revert IFO_Not_Ended();
 
         ifoDetail.hasStarted = false;
-        // ifoDetail.token = address(0);
-        // ifoDetail.id = 0;
+
         ifoDetail.MaxCap = 0;
         ifoDetail.minimumSubscription = 0;
         ifoDetail.maximumSubscription = 0;
@@ -173,6 +172,11 @@ contract Launchpad {
 
     function getAmountPerSubscriber(address _user, uint32 _id) external view returns(uint256) {
         return Amount_per_subscriber[_user][_id];
+    }
+
+    function getPlatformShare(uint32 _id) public view returns(uint256){
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        return ifoDetail.platformShare;
     }
 
     function claimToken(uint32 _id) external {
