@@ -2,7 +2,17 @@
 pragma solidity ^0.8.17;
 
 import "../lib/openzeppelin-contracts/contracts/token/ERC20/IERC20.sol";
-// import "../";
+
+
+///@author Okoli Evans
+///@title  A contract that holds Initial Coin Offerings (ICO), and can handle multiple
+///@title  ICOs at once
+///@dev  The contract admin oversees registration and creation of vetted projects for ICO,
+///@dev  and also monitors the process, and disburses funds at the end of the ICO.
+///@notice  An ID is assigned to every ICO created to for efficient tracking of variables changes and
+///@notice  updates.
+
+
 contract Launchpad {
 
     struct IFODetail {
@@ -17,6 +27,10 @@ contract Launchpad {
         uint256 publicShare;
         uint256 platformShare;
         uint256 exchangeRate;
+        uint256 totalAmountRaised;
+        uint256 endTime;
+        uint256 startTime; 
+        uint256  duration;
         string tokenName;
         string tokenSymbol;
         bool hasStarted;
@@ -27,10 +41,7 @@ contract Launchpad {
     mapping(address => mapping(uint32 => uint256)) Amount_per_subscriber;
 
     address public Controller;
-    uint256 public duration;
-    uint256 public startTime;
-    uint256 endTime;
-    uint256 public totalAmountRaised;
+    uint256 public GlobaltotalAmountRaised;
 
     /////////  ERRORS  ///////////
 
@@ -42,7 +53,6 @@ contract Launchpad {
     error IFO_Not_Ended();
     error IFO_Not_In_Session();
     error IFO_still_in_progress();
-    error Account_Not_Found();
     error Value_cannot_be_empty();
     error IFO_Details_Not_Found();
     error MaxCapReached();
@@ -51,15 +61,25 @@ contract Launchpad {
     error ID_Taken_Choose_Another_ID();
 
     ////////  EVENTS  /////////
+    event ICO_Created(uint32 _id, address _token, uint _creation_time);
+    event ICO_Started(uint32 _id, uint256 _start_time, uint256 _end_time);
+    event BuyPresale(uint32 _id, address _buyer, uint256 _amount);
+    event ICO_Ended(uint32 _id, uint256 _endTime);
+    event Claim_Token(uint32 _id, address _claimer, uint256 _amount);
 
     constructor() {
         Controller = msg.sender;
     }
 
 
-    ////////   FUNCTIONS  ///////////
+   ////////////////////////////////////////////////////////////////
+   ///                                                         ////
+   ///                     CORE FUNCTIONS                      ////
+   ///                                                         ////
+   //////////////////////////////////////////////////////////////// 
 
-    function createIFO(
+
+    function createICO(
         uint32 _id,
         address _admin,
         address _token,
@@ -86,7 +106,8 @@ contract Launchpad {
         if(_exchangeRate <= 0) revert Value_cannot_be_empty();
         if(_admin == address(0)) revert Value_cannot_be_empty();
 
-        IERC20(_token).transferFrom(_admin, address(this), _tokenTotalSupply);
+        bool success = IERC20(_token).transferFrom(_admin, address(this), _tokenTotalSupply);
+        require(success, "Transfer FAIL");
        
         ifoDetail.id = _id;
         ifoDetail.admin = _admin;
@@ -100,25 +121,29 @@ contract Launchpad {
         ifoDetail.exchangeRate = _exchangeRate;
         ifoDetail.tokenName = _tokenName;
         ifoDetail.tokenSymbol = _tokenSymbol;
-        ifoDetail.hasStarted = false;
-        ifoDetail.maxCapReached = false;
+
+        emit ICO_Created(_id, _token, block.timestamp);
 
     }
 
-    function startIFO(uint32 _id, uint256 _endTime) external {
+    function startICO(uint32 _id, uint256 _endTime) external {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         if(msg.sender != Controller) revert notController();
         if (ifoDetail.hasStarted == true) revert IFO_Already_Started();
         if (ifoDetail.id == 0) revert IFO_Details_Not_Found();
 
-        startTime = block.timestamp;
-        duration = _endTime - startTime;
+        uint256 endTime = (_endTime * 1 minutes);
+        ifoDetail.startTime = block.timestamp;
+        ifoDetail.endTime = endTime;
+        ifoDetail.duration = endTime - ifoDetail.startTime;
         ifoDetail.hasStarted = true;
       
+        emit ICO_Started(_id, block.timestamp, endTime / 1 minutes);
     }
 
-    function showDuration() public view returns(uint256 _duration) {
-           _duration = duration;
+    function showDuration(uint32 _id) public view returns(uint256 _duration) {
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        _duration = ifoDetail.duration;
     }
 
 
@@ -133,36 +158,72 @@ contract Launchpad {
 
         uint256 xRate = ifoDetail.exchangeRate;
         uint256 amount_bought = _amount * xRate;
-        ifoDetail.publicShare -= amount_bought;
-        ifoDetail.publicshareBalance += amount_bought;
-        Amount_per_subscriber[msg.sender][_id] += amount_bought;
-        totalAmountRaised += _amount;
-
+        ifoDetail.publicShare = ifoDetail.publicShare - amount_bought;
+        ifoDetail.publicshareBalance = ifoDetail.publicshareBalance + amount_bought;
+        Amount_per_subscriber[msg.sender][_id] = Amount_per_subscriber[msg.sender][_id] + amount_bought;
+        ifoDetail.totalAmountRaised = ifoDetail.totalAmountRaised + _amount;
+        GlobaltotalAmountRaised = GlobaltotalAmountRaised + _amount;
+        
+        emit BuyPresale(_id, msg.sender, _amount);
     }
 
-    function endIFO(uint32 _id) external {
+    function endICO(uint32 _id) external {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         if(msg.sender != Controller) revert notController();
         if (ifoDetail.hasStarted == false) revert IFO_Not_In_Session();
         if (ifoDetail.id == 0) revert IFO_Details_Not_Found();
-        if(block.timestamp < endTime) revert IFO_Not_Ended();
+        if(block.timestamp < ifoDetail.endTime) revert IFO_Not_Ended();
 
         ifoDetail.hasStarted = false;
 
-        ifoDetail.MaxCap = 0;
-        ifoDetail.minimumSubscription = 0;
-        ifoDetail.maximumSubscription = 0;
+        // ifoDetail.MaxCap = 0;
+        // ifoDetail.minimumSubscription = 0;
+        // ifoDetail.maximumSubscription = 0;
 
-        ifoDetail.exchangeRate = 0;
-        ifoDetail.tokenName = "";
-        ifoDetail.tokenSymbol = "";
-        ifoDetail.maxCapReached = false;
-
-        
+        // ifoDetail.exchangeRate = 0;
+        // ifoDetail.tokenName = "";
+        // ifoDetail.tokenSymbol = "";
+        // ifoDetail.maxCapReached = false;
+        emit ICO_Ended(_id, block.timestamp / 1 minutes);
     }
 
+    function claimToken(uint32 _id) external {
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        require(Amount_per_subscriber[msg.sender][_id] > 0, "No record found");
+        if(ifoDetail.hasStarted == true) revert IFO_still_in_progress();
+
+        uint256 _amount = Amount_per_subscriber[msg.sender][_id];
+        if(_amount > ifoDetail.publicshareBalance) revert Insufficient_Funds();
+        ifoDetail.publicshareBalance = ifoDetail.publicshareBalance - _amount;
+       Amount_per_subscriber[msg.sender][_id] = 0;
+       IERC20(ifoDetail.token).transfer(msg.sender, _amount);
+
+       emit Claim_Token(_id, msg.sender, _amount);
+    }
+
+    function withdrawToken(address _to,uint32 _id, uint256 _amount) external returns(uint256) {
+        if(msg.sender != Controller) revert notController();
+        IFODetail storage ifoDetail = IFODetails_ID[_id];
+        if(_to == address(0)) revert Invalid_Address();
+        if(_amount > ifoDetail.platformShare) revert Insufficient_Funds();
+        
+        ifoDetail.platformShare = ifoDetail.platformShare - _amount;
+        IERC20(ifoDetail.token).transfer(_to, _amount);
+        return ifoDetail.platformShare;
+    }
+
+    function withdrawEther(uint256 _amount, address _to) external {
+        if(msg.sender != Controller) revert notController();
+        if(_amount > address(this).balance) revert Insufficient_Funds();
+        if(_to == address(0)) revert Invalid_Address();
+
+        (bool success, ) = payable(_to).call{ value: _amount}("");
+        require(success, "Failed to send Ether");
+    }
+
+
     function getTotalEthRaised() external view returns(uint256){
-        return totalAmountRaised;
+        return GlobaltotalAmountRaised;
     }
 
     function getPublicBalance(uint32 _id) external view returns(uint256){
@@ -178,39 +239,6 @@ contract Launchpad {
         IFODetail storage ifoDetail = IFODetails_ID[_id];
         return ifoDetail.platformShare;
     }
-
-    function claimToken(uint32 _id) external {
-        IFODetail storage ifoDetail = IFODetails_ID[_id];
-        require(Amount_per_subscriber[msg.sender][_id] > 0, "No record found");
-        if(ifoDetail.hasStarted == true) revert IFO_still_in_progress();
-
-        uint256 _amount = Amount_per_subscriber[msg.sender][_id];
-        if(_amount > ifoDetail.publicshareBalance) revert Insufficient_Funds();
-        ifoDetail.publicshareBalance -= _amount;
-       IERC20(ifoDetail.token).transfer(msg.sender, _amount);
-       Amount_per_subscriber[msg.sender][_id] = 0;
-    }
-
-    function withdrawToken(address _to,uint32 _id, uint256 _amount) external returns(uint256) {
-        if(msg.sender != Controller) revert notController();
-        IFODetail storage ifoDetail = IFODetails_ID[_id];
-        if(_to == address(0)) revert Invalid_Address();
-        if(_amount > ifoDetail.platformShare) revert Insufficient_Funds();
-        
-        IERC20(ifoDetail.token).transfer(_to, _amount);
-        ifoDetail.platformShare -= _amount;
-        return ifoDetail.platformShare;
-    }
-
-    function withdrawEther(uint256 _amount, address payable _to) external payable {
-        if(msg.sender != Controller) revert notController();
-        if(_amount > address(this).balance) revert Insufficient_Funds();
-        if(_to == address(0)) revert Invalid_Address();
-
-        (bool success, ) = _to.call{ value: _amount}("");
-        require(success, "Failed to send Ether");
-    }
-
 
     receive() payable external {}
     fallback() payable external {}

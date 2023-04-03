@@ -27,7 +27,7 @@ contract LaunchpadTest is Test {
         vm.prank(admin);
         hashnode.approve(address(launchpad), 2000000 * 1e18);
         
-        launchpad.createIFO(
+        launchpad.createICO(
             100,
             admin,
             address(0x2e234DAe75C793f67A35089C9d99245E1C58470b),
@@ -42,7 +42,7 @@ contract LaunchpadTest is Test {
         );
 
         //DUPLICATE TESTING
-        launchpad.createIFO(
+        launchpad.createICO(
             1001,
             admin,
             address(0x2e234DAe75C793f67A35089C9d99245E1C58470b),
@@ -59,7 +59,7 @@ contract LaunchpadTest is Test {
 
         hashnode.balanceOf(address(launchpad));
         // start ICO
-        launchpad.startIFO(100, 1680421243);
+        launchpad.startICO(100, 1);
 
 
         // BUY ICO TOKEN
@@ -72,7 +72,8 @@ contract LaunchpadTest is Test {
         launchpad.buyPresale{value: 2 ether}(100);
         
         // END ICO
-        launchpad.endIFO(100);
+        vm.warp(2 minutes);
+        launchpad.endICO(100);
 
         //GET BALANCE
         launchpad.getPublicBalance(100);
@@ -84,7 +85,7 @@ contract LaunchpadTest is Test {
         launchpad.getAmountPerSubscriber(address(0x08), 100);
 
         // GET DURATION
-        launchpad.showDuration();
+        launchpad.showDuration(100);
 
         // GET PLATFORM SHARE
         launchpad.getPlatformShare(100);
